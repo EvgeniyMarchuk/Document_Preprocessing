@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "testing"
+version = "0.1.0"
+description = ""
+authors = ["m_evgeniy <marchuk.ep@phystech.edu>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.12.dev0"
+megaparse = {path="MegaParse/libs/megaparse"}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
