@@ -5,39 +5,89 @@ from parser_megaparse import Processing
 import sys
 
 st.title("File Preprocessing")
-st.write("Upload your files, process them, and download the results as a ZIP archive.")
+st.subheader("Выберите режим обработки файла:")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    if st.button("PDF with Text Layer", key="pdf_with_text_layer"):
+        st.session_state["mode"] = "pdf_with_text_layer"
+        st.write("Выбран режим: PDF with Text Layer")
+
+    if st.button("DOCX/DOC (Text and Tables Only)", key="doc_text_only"):
+        st.session_state["mode"] = "doc_text_only"
+        st.write("Выбран режим: DOCX/DOC (Text and Tables Only)")
+
+with col2:
+    if st.button("PDF without Text Layer", key="pdf_without_text_layer"):
+        st.session_state["mode"] = "pdf_without_text_layer"
+        st.write("Выбран режим: PDF without Text Layer")
+
+    if st.button("DOCX/DOC (With Images and Tables)", key="doc_with_images"):
+        st.session_state["mode"] = "doc_with_images"
+        st.write("Выбран режим: DOCX/DOC (With Images and Tables)")
 
 uploaded_files = st.file_uploader("Upload your files", accept_multiple_files=True)
 if uploaded_files:
-    print(f"{uploaded_files = }")
-    # Папка для сохранения обработанных файлов
-    output_dir = "processed_files"
-    os.makedirs(output_dir, exist_ok=True)
+    if "mode" not in st.session_state:
+        st.warning("Сначала выберите режим обработки.")
+    else:
+        mode = st.session_state["mode"]
+        st.write(f"{len(uploaded_files)} файл(ов) обрабатывается в режиме: {mode}")
 
-    # очистка папки от сторонних файлов
-    for file_name in os.listdir(output_dir):
-        file_path = os.path.join(output_dir, file_name)
-        try:
-            if os.path.isfile(file_path) or os.path.islink(file_path):
-                os.unlink(file_path)  # Удаление файла или ссылки
-            elif os.path.isdir(file_path):  
-                shutil.rmtree(file_path)  # Удаление директории
-        except Exception as e:
-            st.error(f"Failed to delete {file_path}. Reason: {e}")
+        # Папка для сохранения обработанных файлов
+        output_dir = f"processed_files"
+        os.makedirs(output_dir, exist_ok=True)
 
-    st.write(f"{len(uploaded_files)} files are processing now:")
-    for file in uploaded_files:
-        st.write(file.name)
-        Processing([file.name])
+        # Папка для сохранения загруженных на сайт файлов
+        input_dir = f"uploaded_files"
+        os.makedirs(input_dir, exist_ok=True)
 
-    # Архивация результатов
-    zip_path = shutil.make_archive("processed_files", "zip", output_dir)
+        # очистка папок от сторонних файлов
+        for file_name in os.listdir(output_dir):
+            file_path = os.path.join(output_dir, file_name)
+            try:
+                if os.path.isfile(file_path) or os.path.islink(file_path):
+                    os.unlink(file_path)  # Удаление файла или ссылки
+                elif os.path.isdir(file_path):  
+                    shutil.rmtree(file_path)  # Удаление директории
+            except Exception as e:
+                st.error(f"Failed to delete {file_path}. Reason: {e}")
+        for file_name in os.listdir(input_dir):
+            file_path = os.path.join(input_dir, file_name)
+            try:
+                if os.path.isfile(file_path) or os.path.islink(file_path):
+                    os.unlink(file_path)  # Удаление файла или ссылки
+                elif os.path.isdir(file_path):  
+                    shutil.rmtree(file_path)  # Удаление директории
+            except Exception as e:
+                st.error(f"Failed to delete {file_path}. Reason: {e}")
 
-    # Скачивание архива
-    st.success("Files processed successfully!")
-    st.download_button(
-        label="Download ZIP Archive",
-        data=open(zip_path, "rb").read(),
-        file_name="processed_files.zip",
-        mime="application/zip"
-    )
+
+        for file in uploaded_files:
+            file_name = file.name
+            st.write(f"Обрабатывается файл: {file_name}")
+
+            # Чтение содержимого файла
+            file_bytes = file.read()  # Считывает все содержимое файла в байтах
+
+            with open(os.path.join("uploaded_files", file_name), "wb") as f:
+                f.write(file_bytes)
+            
+            #############################################################
+            # TODO: тут добавить разные режимы в функцию Processing,    #
+            # т.к. пока что только для pdf с Megaparse работает         #
+            #############################################################
+            Processing([file.name], mode)
+
+        # Архивация результатов
+        zip_path = shutil.make_archive(f"processed_{mode}_files", "zip", output_dir)
+
+        # Скачивание архива
+        st.success("Файлы успешно обработаны!")
+        st.download_button(
+            label="Загрузить ZIP архив",
+            data=open(zip_path, "rb").read(),
+            file_name=f"processed_{mode}_files.zip",
+            mime="application/zip"
+        )

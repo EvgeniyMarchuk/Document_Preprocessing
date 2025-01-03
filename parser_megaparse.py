@@ -7,8 +7,8 @@ from megaparse.src.megaparse.parser.megaparse_vision import MegaParseVision
 from langchain_openai import ChatOpenAI
 
 
-def Processing(name_of_files):
-    os.environ["OPENAI_API_KEY"] = "YOUR API KEY"
+def Processing(name_of_files, mode):
+    os.environ["OPENAI_API_KEY"] = "YOUR_API_KEY"
 
     model = ChatOpenAI(model="gpt-4o", api_key=os.getenv("OPENAI_API_KEY"))  # Подключаем модель через API
 
@@ -17,7 +17,7 @@ def Processing(name_of_files):
     megaparse = MegaParse(parser)
 
     for name_of_file in name_of_files:
-        response = megaparse.load(f"./test_files/{name_of_file}")
+        response = megaparse.load(f"./uploaded_files/{name_of_file}")
 
         # Сохранение результата в Markdown
         output_path = f"./processed_files/{name_of_file[:-3]}md"
