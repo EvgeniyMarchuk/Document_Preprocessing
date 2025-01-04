@@ -6,6 +6,10 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath("./MegaParse/libs"))
 
+from megaparse.src.megaparse.megaparse import MegaParse
+from megaparse.src.megaparse.parser.megaparse_vision import MegaParseVision
+from langchain_openai import ChatOpenAI
+
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.document_converter import DocumentConverter, PdfFormatOption
@@ -13,10 +17,6 @@ from docling_core.types.doc.labels import DocItemLabel
 from docling_core.types.doc import DoclingDocument, ImageRefMode, PictureItem
 
 from markitdown import MarkItDown
-
-from megaparse.src.megaparse.megaparse import MegaParse
-from megaparse.src.megaparse.parser.megaparse_vision import MegaParseVision
-from langchain_openai import ChatOpenAI
 
 
 IMAGE_RESOLUTION_SCALE = 2.0
@@ -98,7 +98,7 @@ class Parser():
             case 'pdf_without_text_layer':
                 self.megaparse = self._megaparse_parser()
                 self.doc_converter = self._docling_parser()
-                self.convert = self.docx_with_img_parse
+                self.convert = self.pdf_with_img_parse
 
     # def convert(self, name_of_files, mode):
     #     match mode:
@@ -145,6 +145,7 @@ class Parser():
         images_dir = output_dir / "images/"
         images_dir.mkdir(parents=True, exist_ok=True)
 
+# Евгений напишите pattern для вставки изображений и передайте его методу ниже!
         result = self._insert_ref(response, images_list)
         with open(md_filename, 'w', encoding='utf-8') as f:
             f.write(result)   
@@ -178,13 +179,16 @@ class Parser():
         with open(md_filename, 'w', encoding='utf-8') as f:
             f.write(parsed_text)        
             
-    def _insert_ref(self, text, images_list):
+    def _insert_ref(self, text, images_list, pattern=r"\(data:image\/([a-zA-Z]+);base64\.\.\.\)"):
         res = ''
-        pattern = r"\(data:image\/([a-zA-Z]+);base64\.\.\.\)"
         last_pos = 0
+        n = len(images_list)
         for ind, match in enumerate(re.finditer(pattern, text)):
             # print(match.group())
             # print(parsed_text[match.start():match.end()])
+            if ind > n:
+                res += text[last_pos:]
+                break
             res += text[last_pos:match.start()] + f'({images_list[ind]})'
             last_pos = match.end()
         return res

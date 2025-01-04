@@ -2,7 +2,6 @@ import streamlit as st
 import os
 import shutil
 from parse import Parser
-import sys
 
 
 st.title("File Preprocessing")
