@@ -4,7 +4,7 @@ import shutil
 import re
 import sys
 import os
-
+sys.path.insert(0, os.path.abspath("./MegaParse/libs"))
 
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions
@@ -13,6 +13,11 @@ from docling_core.types.doc.labels import DocItemLabel
 from docling_core.types.doc import DoclingDocument, ImageRefMode, PictureItem
 
 from markitdown import MarkItDown
+
+from megaparse.src.megaparse.megaparse import MegaParse
+from megaparse.src.megaparse.parser.megaparse_vision import MegaParseVision
+from langchain_openai import ChatOpenAI
+
 
 IMAGE_RESOLUTION_SCALE = 2.0
 
@@ -76,58 +81,103 @@ def save_as_markdown(
 
 DoclingDocument.save_as_markdown = save_as_markdown
 
+
 class Parser():
-    def convert(self, file_path, output_path='./'):
-        match file_path.split('.')[-1]:
-            case 'pdf':
-                self.pdf_parse(file_path, output_path)
-            case 'docx':
-                self.docx_parse(file_path, output_path)
+    def __init__(self, mode):
+        match mode:
+            case 'doc_with_images':
+                self.md = MarkItDown()
+                self.doc_converter = self._docling_parser()
+                self.convert = self.docx_with_img_parse
+            case 'doc_text_only':
+                self.md = MarkItDown()
+                self.convert = self.docx_text_only_parse
+            case 'pdf_with_text_layer':
+                self.megaparse = self._megaparse_parser()
+                self.convert = self.pdf_text_only_parse
+            case 'pdf_without_text_layer':
+                self.megaparse = self._megaparse_parser()
+                self.doc_converter = self._docling_parser()
+                self.convert = self.docx_with_img_parse
+
+    # def convert(self, name_of_files, mode):
+    #     match mode:
+    #         case 'doc_with_images':
+    #             self.docx_with_img_parse(name_of_files)
+    #         case 'doc_text_only':
+    #             self.docx_text_only_parse(name_of_files)
+    #         case 'pdf_with_text_layer':
+    #             self.pdf_text_only_parse(name_of_files)
+    #         case 'pdf_without_text_layer':
+    #             self.pdf_with_img_parse(name_of_files)
     
-    def pdf_parse(self, file_path, output_path='./'):  
-        input_doc_path = Path(file_path)
-        output_dir = Path(output_path) / f"parsed_{input_doc_path.name}"
+    def pdf_text_only_parse(self, name_of_file):
+        self.megaparse.load(f"./uploaded_files/{name_of_file}")
+
+        # Сохранение результата в Markdown
+        output_path = f"./processed_files/{name_of_file[:-3]}md"
+        self.megaparse.save(output_path)
+        print(f"Результат сохранён в: {output_path}")
+
+    def pdf_with_img_parse(self, name_of_file):
+        response = self.megaparse.load(f"./uploaded_files/{name_of_file}")
+
+        # Сохранение результата в Markdown
+        # output_path = f"./processed_files/{name_of_file[:-3]}md"
+        # megaparse.save(output_path)
+        # print(f"Результат сохранён в: {output_path}")
+
+        input_doc_path = Path(f"./uploaded_files/{name_of_file}")
+        output_dir = Path(f"./processed_files/parsed_{input_doc_path.name}")
 
         temp_input_doc_path = input_doc_path.parent / 'temp_file.pdf'
         shutil.copy(input_doc_path, temp_input_doc_path)
 
-        doc_converter = self._docling_parse()
-
-        conv_res = doc_converter.convert(temp_input_doc_path)
+        conv_res = self.doc_converter.convert(temp_input_doc_path)
         temp_input_doc_path.unlink()
 
         output_dir.mkdir(parents=True, exist_ok=True)
-
-        md_filename = output_dir / f"{input_doc_path.name}.md"
-        images_dir = output_dir / "images/"
-        images_dir.mkdir(parents=True, exist_ok=True)
-        conv_res.document.save_as_markdown(md_filename, artifacts_dir=images_dir, image_mode=ImageRefMode.REFERENCED)
-
-        self._make_zip(output_dir)
-        
-    def docx_parse(self, file_path, output_path='./'):
-
-        input_doc_path = Path(file_path)
-        output_dir = Path(output_path) / f"parsed_{input_doc_path.name}"
-
-        doc_converter = self._docling_parse()
-        conv_res = doc_converter.convert(input_doc_path)
-
-        output_dir.mkdir(parents=True, exist_ok=True)
-
+            
         images_list = self._get_images(output_dir, conv_res.document)
 
         md_filename = output_dir / f"{input_doc_path.name}.md"
 
-        md = MarkItDown()
-        parsed_text = md.convert(input_doc_path.as_posix()).text_content
+        images_dir = output_dir / "images/"
+        images_dir.mkdir(parents=True, exist_ok=True)
+
+        result = self._insert_ref(response, images_list)
+        with open(md_filename, 'w', encoding='utf-8') as f:
+            f.write(result)   
+        
+    def docx_with_img_parse(self, name_of_file):
+        input_doc_path = Path(f"./uploaded_files/{name_of_file}")
+        output_dir = Path(f"./processed_files/parsed_{input_doc_path.name}")
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        conv_res = self.doc_converter.convert(input_doc_path)
+        
+        images_list = self._get_images(output_dir, conv_res.document)
+
+        md_filename = output_dir / f"{input_doc_path.name}.md"
+
+        parsed_text = self.md.convert(input_doc_path.as_posix()).text_content
         result = self._insert_ref(parsed_text, images_list)
 
         with open(md_filename, 'w', encoding='utf-8') as f:
             f.write(result)        
-        
-        self._make_zip(output_dir)
-        
+            
+    def docx_text_only_parse(self, name_of_file):
+        input_doc_path = Path(f"./uploaded_files/{name_of_file}")
+        output_dir = Path(f"./processed_files/parsed_{input_doc_path.name}")
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        md_filename = output_dir / f"{input_doc_path.name}.md"
+
+        parsed_text = self.md.convert(input_doc_path.as_posix()).text_content
+
+        with open(md_filename, 'w', encoding='utf-8') as f:
+            f.write(parsed_text)        
+            
     def _insert_ref(self, text, images_list):
         res = ''
         pattern = r"\(data:image\/([a-zA-Z]+);base64\.\.\.\)"
@@ -156,11 +206,20 @@ class Parser():
         
         return res
 
-    def _make_zip(self, output_dir):
-        shutil.make_archive(output_dir, 'zip', root_dir=output_dir.parent, base_dir=output_dir.name)
-        shutil.rmtree(output_dir)
+    # def _make_zip(self, output_dir):
+    #     shutil.make_archive(output_dir, 'zip', root_dir=output_dir.parent, base_dir=output_dir.name)
+    #     shutil.rmtree(output_dir)
 
-    def _docling_parse(self):
+    def _megaparse_parser(self):
+        os.environ["OPENAI_API_KEY"] = "YOUR_API_KEY"
+
+        model = ChatOpenAI(model="gpt-4o", api_key=os.getenv("OPENAI_API_KEY"))  # Подключаем модель через API
+
+        parser = MegaParseVision(model=model)
+
+        return MegaParse(parser)
+
+    def _docling_parser(self):
         pipeline_options = PdfPipelineOptions()
         pipeline_options.images_scale = IMAGE_RESOLUTION_SCALE
         pipeline_options.generate_picture_images = True
@@ -170,12 +229,3 @@ class Parser():
                         InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
                     }
                 )
-    
-if __name__ == "__main__":
-    list = ['./raw_files/for_parse/4.0 Ремонт кабельных линий (ЦУ).docx',
-            './raw_files/for_parse/Опл001_Опросный лист ОЛ24.001.1012.050821 (Вездеход на ко.pdf', 
-            './raw_files/for_parse/ТП_лодка.pdf',
-            './raw_files/for_parse/45160618.docx']
-    parse = Parser()
-    for name in list:
-        parse.convert(name)

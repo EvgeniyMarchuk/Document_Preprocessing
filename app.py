@@ -1,8 +1,9 @@
 import streamlit as st
 import os
 import shutil
-from parser_megaparse import Processing
+from parse import Parser
 import sys
+
 
 st.title("File Preprocessing")
 st.subheader("Выберите режим обработки файла:")
@@ -63,7 +64,7 @@ if uploaded_files:
             except Exception as e:
                 st.error(f"Failed to delete {file_path}. Reason: {e}")
 
-
+        parser = Parser(st.session_state['mode'])
         for file in uploaded_files:
             file_name = file.name
             st.write(f"Обрабатывается файл: {file_name}")
@@ -78,7 +79,7 @@ if uploaded_files:
             # TODO: тут добавить разные режимы в функцию Processing,    #
             # т.к. пока что только для pdf с Megaparse работает         #
             #############################################################
-            Processing([file.name], mode)
+            parser.convert(file.name)
 
         # Архивация результатов
         zip_path = shutil.make_archive(f"processed_{mode}_files", "zip", output_dir)
