@@ -100,24 +100,18 @@ class Parser():
                 self.doc_converter = self._docling_parser()
                 self.convert = self.pdf_with_img_parse
 
-    # def convert(self, name_of_files, mode):
-    #     match mode:
-    #         case 'doc_with_images':
-    #             self.docx_with_img_parse(name_of_files)
-    #         case 'doc_text_only':
-    #             self.docx_text_only_parse(name_of_files)
-    #         case 'pdf_with_text_layer':
-    #             self.pdf_text_only_parse(name_of_files)
-    #         case 'pdf_without_text_layer':
-    #             self.pdf_with_img_parse(name_of_files)
-    
+
     def pdf_text_only_parse(self, name_of_file):
         self.megaparse.load(f"./uploaded_files/{name_of_file}")
 
+        output_dir = Path(f"./processed_files/parsed_{name_of_file}")
+        output_dir.mkdir(parents=True, exist_ok=True)
         # Сохранение результата в Markdown
-        output_path = f"./processed_files/{name_of_file[:-3]}md"
+        output_path = output_dir / f"{name_of_file[:-3]}md"
+        output_path = output_path.as_posix()
         self.megaparse.save(output_path)
         print(f"Результат сохранён в: {output_path}")
+
 
     def pdf_with_img_parse(self, name_of_file):
         response = self.megaparse.load(f"./uploaded_files/{name_of_file}")
@@ -145,8 +139,7 @@ class Parser():
         images_dir = output_dir / "images/"
         images_dir.mkdir(parents=True, exist_ok=True)
 
-# Евгений напишите pattern для вставки изображений и передайте его методу ниже!
-        result = self._insert_ref(response, images_list)
+        result = self._insert_ref_mega(response, images_list, pattern = r"!\[Image\][^\s]*")
         with open(md_filename, 'w', encoding='utf-8') as f:
             f.write(result)   
         
@@ -166,7 +159,7 @@ class Parser():
 
         with open(md_filename, 'w', encoding='utf-8') as f:
             f.write(result)        
-            
+
     def docx_text_only_parse(self, name_of_file):
         input_doc_path = Path(f"./uploaded_files/{name_of_file}")
         output_dir = Path(f"./processed_files/parsed_{input_doc_path.name}")
@@ -186,10 +179,24 @@ class Parser():
         for ind, match in enumerate(re.finditer(pattern, text)):
             # print(match.group())
             # print(parsed_text[match.start():match.end()])
-            if ind > n:
+            if ind >= n:
                 res += text[last_pos:]
                 break
             res += text[last_pos:match.start()] + f'({images_list[ind]})'
+            last_pos = match.end()
+        return res
+
+    def _insert_ref_mega(self, text, images_list, pattern=r"\(data:image\/([a-zA-Z]+);base64\.\.\.\)"):
+        res = ''
+        last_pos = 0
+        n = len(images_list)
+        for ind, match in enumerate(re.finditer(pattern, text)):
+            # print(match.group())
+            # print(parsed_text[match.start():match.end()])
+            if ind >= n:
+                res += text[last_pos:]
+                break
+            res += text[last_pos:match.start()] + f'![Image]({images_list[ind]})'
             last_pos = match.end()
         return res
     
@@ -215,7 +222,7 @@ class Parser():
     #     shutil.rmtree(output_dir)
 
     def _megaparse_parser(self):
-        os.environ["OPENAI_API_KEY"] = "YOUR_API_KEY"
+        os.environ["OPENAI_API_KEY"] = "YOR_API_KEY"
 
         model = ChatOpenAI(model="gpt-4o", api_key=os.getenv("OPENAI_API_KEY"))  # Подключаем модель через API
 

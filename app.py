@@ -4,7 +4,7 @@ import shutil
 from parse import Parser
 
 
-st.title("File Preprocessing")
+st.title("Обработка файлов в .md формат")
 st.subheader("Выберите режим обработки файла:")
 
 col1, col2 = st.columns(2)
@@ -73,12 +73,22 @@ if uploaded_files:
 
             with open(os.path.join("uploaded_files", file_name), "wb") as f:
                 f.write(file_bytes)
-            
-            #############################################################
-            # TODO: тут добавить разные режимы в функцию Processing,    #
-            # т.к. пока что только для pdf с Megaparse работает         #
-            #############################################################
+
             parser.convert(file.name)
+
+            # Архивация результатов
+            zip_path = shutil.make_archive(f"parsed_{file_name}", "zip", root_dir=output_dir, base_dir=f'parsed_{file_name}')
+            # shutil.rmtree(f'{output_dir}/parsed_{file_name}')
+
+            # Скачивание архива
+            st.success("Файл успешно обработан!")
+            st.download_button(
+                label="Загрузить ZIP архив",
+                data=open(zip_path, "rb").read(),
+                file_name=f"parsed_{file_name}.zip",
+                mime="application/zip"
+            )
+
 
         # Архивация результатов
         zip_path = shutil.make_archive(f"processed_{mode}_files", "zip", output_dir)
@@ -91,3 +101,13 @@ if uploaded_files:
             file_name=f"processed_{mode}_files.zip",
             mime="application/zip"
         )
+
+        for file_name in os.listdir(input_dir):
+            file_path = os.path.join(input_dir, file_name)
+            try:
+                if os.path.isfile(file_path) or os.path.islink(file_path):
+                    os.unlink(file_path)  # Удаление файла или ссылки
+                elif os.path.isdir(file_path):  
+                    shutil.rmtree(file_path)  # Удаление директории
+            except Exception as e:
+                st.error(f"Failed to delete {file_path}. Reason: {e}")
