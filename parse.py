@@ -104,7 +104,7 @@ class Parser():
     def pdf_text_only_parse(self, name_of_file):
         self.megaparse.load(f"./uploaded_files/{name_of_file}")
 
-        output_dir = Path(f"./processed_files/parsed_{name_of_file}")
+        output_dir = Path(f"./processed_files/parsed_{name_of_file[:-4]}")
         output_dir.mkdir(parents=True, exist_ok=True)
         # Сохранение результата в Markdown
         output_path = output_dir / f"{name_of_file[:-3]}md"
@@ -122,7 +122,7 @@ class Parser():
         # print(f"Результат сохранён в: {output_path}")
 
         input_doc_path = Path(f"./uploaded_files/{name_of_file}")
-        output_dir = Path(f"./processed_files/parsed_{input_doc_path.name}")
+        output_dir = Path(f"./processed_files/parsed_{input_doc_path.name[:-4]}")
 
         temp_input_doc_path = input_doc_path.parent / 'temp_file.pdf'
         shutil.copy(input_doc_path, temp_input_doc_path)
@@ -134,45 +134,45 @@ class Parser():
             
         images_list = self._get_images(output_dir, conv_res.document)
 
-        md_filename = output_dir / f"{input_doc_path.name}.md"
+        md_filename = output_dir / f"{input_doc_path.name[:-3]}md"
 
         images_dir = output_dir / "images/"
         images_dir.mkdir(parents=True, exist_ok=True)
 
-        result = self._insert_ref_mega(response, images_list, pattern = r"!\[Image\][^\s]*")
+        result = self._insert_ref(response, images_list, pattern = r"!\[Image\][^\s]*", prefix='![Image]')
         with open(md_filename, 'w', encoding='utf-8') as f:
             f.write(result)   
         
     def docx_with_img_parse(self, name_of_file):
         input_doc_path = Path(f"./uploaded_files/{name_of_file}")
-        output_dir = Path(f"./processed_files/parsed_{input_doc_path.name}")
+        output_dir = Path(f"./processed_files/parsed_{input_doc_path.name.rpartition('.')[0]}")
         output_dir.mkdir(parents=True, exist_ok=True)
 
         conv_res = self.doc_converter.convert(input_doc_path)
         
         images_list = self._get_images(output_dir, conv_res.document)
 
-        md_filename = output_dir / f"{input_doc_path.name}.md"
+        md_filename = output_dir / f"{input_doc_path.name.rpartition('.')[0]}.md"
 
         parsed_text = self.md.convert(input_doc_path.as_posix()).text_content
-        result = self._insert_ref(parsed_text, images_list)
+        result = self._insert_ref(parsed_text, images_list, pattern=r"\(data:image\/([a-zA-Z]+);base64\.\.\.\)")
 
         with open(md_filename, 'w', encoding='utf-8') as f:
             f.write(result)        
 
     def docx_text_only_parse(self, name_of_file):
         input_doc_path = Path(f"./uploaded_files/{name_of_file}")
-        output_dir = Path(f"./processed_files/parsed_{input_doc_path.name}")
+        output_dir = Path(f"./processed_files/parsed_{input_doc_path.name.rpartition('.')[0]}")
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        md_filename = output_dir / f"{input_doc_path.name}.md"
+        md_filename = output_dir / f"{input_doc_path.name.rpartition('.')[0]}.md"
 
         parsed_text = self.md.convert(input_doc_path.as_posix()).text_content
 
         with open(md_filename, 'w', encoding='utf-8') as f:
             f.write(parsed_text)        
             
-    def _insert_ref(self, text, images_list, pattern=r"\(data:image\/([a-zA-Z]+);base64\.\.\.\)"):
+    def _insert_ref(self, text, images_list, pattern, prefix=''):
         res = ''
         last_pos = 0
         n = len(images_list)
@@ -182,21 +182,7 @@ class Parser():
             if ind >= n:
                 res += text[last_pos:]
                 break
-            res += text[last_pos:match.start()] + f'({images_list[ind]})'
-            last_pos = match.end()
-        return res
-
-    def _insert_ref_mega(self, text, images_list, pattern=r"\(data:image\/([a-zA-Z]+);base64\.\.\.\)"):
-        res = ''
-        last_pos = 0
-        n = len(images_list)
-        for ind, match in enumerate(re.finditer(pattern, text)):
-            # print(match.group())
-            # print(parsed_text[match.start():match.end()])
-            if ind >= n:
-                res += text[last_pos:]
-                break
-            res += text[last_pos:match.start()] + f'![Image]({images_list[ind]})'
+            res += text[last_pos:match.start()] + f'{prefix}({images_list[ind]})'
             last_pos = match.end()
         return res
     
