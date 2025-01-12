@@ -85,28 +85,28 @@ DoclingDocument.save_as_markdown = save_as_markdown
 class Parser():
     def __init__(self, mode):
         match mode:
-            case 'doc_with_images':
+            case 'docx_with_images':
                 self.md = MarkItDown()
                 self.doc_converter = self._docling_parser()
                 self.convert = self.docx_with_img
-            case 'doc_text_only':
+            case 'docx_text_only':
                 self.md = MarkItDown()
                 self.convert = self.docx_text_only
-            case 'pdf_with_text_layer':
+            case 'pdf_text_megaparse':
                 self.megaparse = self._megaparse_parser()
-                self.convert = self.pdf_text_only
-            case 'pdf_without_text_layer':
+                self.convert = self.pdf_text_megaparse
+            case 'pdf_images_megaparse':
                 self.megaparse = self._megaparse_parser()
                 self.doc_converter = self._docling_parser()
-                self.convert = self.pdf_with_img
-            case 'pdf_with_images_docling':
+                self.convert = self.pdf_images_megaparse
+            case 'pdf_images_docling':
                 self.doc_converter = self._docling_parser()
-                self.convert = self.pdf_with_img_docling
-            case 'pdf_text_only_docling':
+                self.convert = self.pdf_images_docling
+            case 'pdf_text_docling':
                 self.doc_converter = self._docling_parser(img_flag=False)
-                self.convert = self.pdf_text_only_docling
+                self.convert = self.pdf_text_docling
 
-    def pdf_text_only_docling(self, name_of_file):
+    def pdf_text_docling(self, name_of_file):
         input_doc_path = Path(f"./uploaded_files/{name_of_file}")
         output_dir = Path(f"./processed_files/parsed_{input_doc_path.name[:-4]}")
 
@@ -122,7 +122,7 @@ class Parser():
         conv_res.document.save_as_markdown(md_file_path)
 # Добавить метод, который будет убирать пометки о наличии картинок
 
-    def pdf_with_img_docling(self, name_of_file):
+    def pdf_images_docling(self, name_of_file):
         input_doc_path = Path(f"./uploaded_files/{name_of_file}")
         output_dir = Path(f"./processed_files/parsed_{input_doc_path.name[:-4]}")
 
@@ -139,7 +139,7 @@ class Parser():
         images_dir.mkdir(parents=True, exist_ok=True)
         conv_res.document.save_as_markdown(md_file_path, artifacts_dir=images_dir, image_mode=ImageRefMode.REFERENCED)
 
-    def pdf_text_only(self, name_of_file):
+    def pdf_text_megaparse(self, name_of_file):
         self.megaparse.load(f"./uploaded_files/{name_of_file}")
 
         output_dir = Path(f"./processed_files/parsed_{name_of_file[:-4]}")
@@ -149,7 +149,7 @@ class Parser():
         md_file_path = md_file_path.as_posix()
         self.megaparse.save(md_file_path)
 
-    def pdf_with_img(self, name_of_file):
+    def pdf_images_megaparse(self, name_of_file):
         input_doc_path = Path(f"./uploaded_files/{name_of_file}")
         output_dir = Path(f"./processed_files/parsed_{input_doc_path.name[:-4]}")
         temp_input_doc_path = input_doc_path.parent / 'temp_file.pdf'
@@ -230,7 +230,7 @@ class Parser():
     #     shutil.rmtree(output_dir)
 
     def _megaparse_parser(self):
-        os.environ["OPENAI_API_KEY"] = "YOR_API_KEY"
+        os.environ["OPENAI_API_KEY"] = "YOUR_API_KEY"
 
         model = ChatOpenAI(model="gpt-4o", api_key=os.getenv("OPENAI_API_KEY"))  # Подключаем модель через API
 
